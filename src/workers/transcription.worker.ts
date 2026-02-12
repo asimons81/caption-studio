@@ -144,7 +144,6 @@ async function loadModel(modelName: 'tiny' | 'small', requestId: string) {
     transcriber = (await pipeline(
       'automatic-speech-recognition',
       modelId,
-      // @ts-expect-error transformers types don't fully describe progress_callback in this version
       { progress_callback }
     )) as unknown as AutomaticSpeechRecognitionPipeline;
     transcriberModelId = modelId;

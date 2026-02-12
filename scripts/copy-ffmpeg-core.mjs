@@ -84,6 +84,52 @@ function relFromRepo(filePath) {
   return path.relative(repoRoot, filePath).replace(/\\/g, '/');
 }
 
+async function resolveCoreBaseDir() {
+  // Preferred path when package.json is exportable.
+  try {
+    const packageJsonPath = require.resolve('@ffmpeg/core/package.json');
+    return {
+      baseDir: path.dirname(packageJsonPath),
+      packageJsonPath,
+      via: 'package-json',
+    };
+  } catch {
+    // Fall through to entrypoint resolution.
+  }
+
+  try {
+    const entryPath = require.resolve('@ffmpeg/core');
+    let current = path.dirname(entryPath);
+
+    for (let i = 0; i < 8; i++) {
+      const maybePackageJson = path.join(current, 'package.json');
+      if (await exists(maybePackageJson)) {
+        try {
+          const raw = await fs.readFile(maybePackageJson, 'utf8');
+          const pkg = JSON.parse(raw);
+          if (pkg?.name === '@ffmpeg/core') {
+            return {
+              baseDir: current,
+              packageJsonPath: maybePackageJson,
+              via: 'entrypoint-walk',
+            };
+          }
+        } catch {
+          // continue walking upward
+        }
+      }
+
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  } catch {
+    // no-op
+  }
+
+  return null;
+}
+
 async function copyAsset(src, destName) {
   const dest = path.join(destDir, destName);
   await fs.copyFile(src, dest);
@@ -95,17 +141,16 @@ async function main() {
   const mode = strict ? 'strict' : 'normal';
   console.log(`[ffmpeg] Copy mode: ${mode}`);
 
-  let corePackageJsonPath;
-  try {
-    corePackageJsonPath = require.resolve('@ffmpeg/core/package.json');
-  } catch (error) {
+  const coreResolution = await resolveCoreBaseDir();
+  if (!coreResolution) {
     console.error('[ffmpeg] Could not resolve @ffmpeg/core/package.json.');
     console.error('[ffmpeg] Make sure @ffmpeg/core is installed and not pruned by your package manager.');
     process.exitCode = 1;
     return;
   }
 
-  const coreBaseDir = path.dirname(corePackageJsonPath);
+  const coreBaseDir = coreResolution.baseDir;
+  const corePackageJsonPath = coreResolution.packageJsonPath;
   await fs.mkdir(destDir, { recursive: true });
 
   const foundCoreJs = await findFirst(coreBaseDir, CANDIDATES.coreJs);
@@ -139,7 +184,7 @@ async function main() {
   }
 
   console.log('[ffmpeg] Asset copy summary:');
-  console.log(`[ffmpeg] - package: ${relFromRepo(corePackageJsonPath)}`);
+  console.log(`[ffmpeg] - package (${coreResolution.via}): ${relFromRepo(corePackageJsonPath)}`);
   for (const item of copied) {
     console.log(`[ffmpeg] - ${item.type}: ${relFromRepo(item.source)} -> ${relFromRepo(item.output)}`);
   }
