@@ -2,7 +2,11 @@ import type { VideoFile } from '../../types/video';
 import { SUPPORTED_VIDEO_FORMATS, MAX_FILE_SIZE, WARN_FILE_SIZE } from '../../constants/defaults';
 
 export function isValidVideoFile(file: File): boolean {
-  const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+  const parts = file.name.split('.');
+  if (parts.length < 2) {
+    return false; // No extension
+  }
+  const extension = '.' + parts.pop()!.toLowerCase();
   return SUPPORTED_VIDEO_FORMATS.includes(extension);
 }
 
@@ -30,11 +34,17 @@ export async function loadVideoMetadata(file: File): Promise<VideoFile> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
+    let timeoutId: number;
 
-    video.preload = 'metadata';
-    video.src = url;
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      video.removeEventListener('loadedmetadata', handleMetadata);
+      video.removeEventListener('error', handleError);
+    };
 
-    video.addEventListener('loadedmetadata', () => {
+    const handleMetadata = () => {
+      cleanup();
+
       const videoAny = video as any;
       const hasAudio = videoAny.mozHasAudio ||
                        Boolean(videoAny.webkitAudioDecodedByteCount) ||
@@ -48,12 +58,28 @@ export async function loadVideoMetadata(file: File): Promise<VideoFile> {
         height: video.videoHeight,
         hasAudio,
       });
-    });
+    };
 
-    video.addEventListener('error', () => {
+    const handleError = () => {
+      cleanup();
       URL.revokeObjectURL(url);
-      reject(new Error('Failed to load video metadata'));
-    });
+      reject(new Error('Failed to load video metadata. The video file may be corrupted or in an unsupported format.'));
+    };
+
+    const handleTimeout = () => {
+      cleanup();
+      URL.revokeObjectURL(url);
+      reject(new Error('Video metadata loading timed out. The video file may be corrupted.'));
+    };
+
+    video.preload = 'metadata';
+    video.addEventListener('loadedmetadata', handleMetadata);
+    video.addEventListener('error', handleError);
+
+    // Set a 30-second timeout for loading metadata
+    timeoutId = window.setTimeout(handleTimeout, 30000);
+
+    video.src = url;
   });
 }
 

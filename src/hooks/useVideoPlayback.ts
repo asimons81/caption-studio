@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useAtom, useSetAtom, useAtomValue } from 'jotai';
-import { videoRefAtom, playbackStateAtom, videoFileAtom } from '../atoms/videoAtoms';
+import { useAtom, useSetAtom } from 'jotai';
+import { videoRefAtom, playbackStateAtom } from '../atoms/videoAtoms';
 
 export function useVideoPlayback() {
-  const videoFile = useAtomValue(videoFileAtom);
   const [videoRef, setVideoRef] = useAtom(videoRefAtom);
   const setPlaybackState = useSetAtom(playbackStateAtom);
   const rafIdRef = useRef<number | undefined>(undefined);
@@ -102,7 +101,6 @@ export function useVideoPlayback() {
   };
 
   return {
-    videoRef: videoFile?.url,
     setVideoRef,
     play,
     pause,
