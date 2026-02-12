@@ -45,10 +45,10 @@ export async function loadVideoMetadata(file: File): Promise<VideoFile> {
     const handleMetadata = () => {
       cleanup();
 
-      const videoAny = video as any;
-      const hasAudio = videoAny.mozHasAudio ||
-                       Boolean(videoAny.webkitAudioDecodedByteCount) ||
-                       Boolean(videoAny.audioTracks?.length);
+      // Default hasAudio to true - there's no reliable cross-browser way
+      // to detect audio at metadata load time. The transcription pipeline
+      // handles videos without audio gracefully.
+      const hasAudio = true;
 
       resolve({
         file,

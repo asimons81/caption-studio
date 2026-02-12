@@ -34,19 +34,15 @@ export function useTranscription() {
         return;
       }
 
-      if (!videoFile.hasAudio) {
-        setError('Video has no audio track');
-        return;
-      }
-
       setIsTranscribing(true);
       setError(null);
       setProgress({ phase: 'extract', progress: 0, message: 'Extracting audio...' });
 
       try {
-        // Extract audio from video
-        setProgress({ phase: 'extract', progress: 5, message: 'Extracting audio from video...' });
-        const audioData = await extractAudioFromVideo(videoFile.file);
+        // Extract audio from video with progress callback
+        const audioData = await extractAudioFromVideo(videoFile.file, (progress, message) => {
+          setProgress({ phase: 'extract', progress, message });
+        });
 
         setProgress({ phase: 'extract', progress: 10, message: 'Audio extracted, loading model...' });
 

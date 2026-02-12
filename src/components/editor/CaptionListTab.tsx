@@ -86,7 +86,7 @@ export function CaptionListTab() {
           size="sm"
           variant="secondary"
           onClick={() => setIsTranscribeModalOpen(true)}
-          disabled={!videoFile?.hasAudio || isTranscribing}
+          disabled={!videoFile || isTranscribing}
         >
           {isTranscribing ? 'Transcribing...' : 'Transcribe'}
         </Button>
