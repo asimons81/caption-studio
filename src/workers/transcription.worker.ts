@@ -54,6 +54,17 @@ interface CancelMessage {
   requestId: string;
 }
 
+interface ModelTestMessage {
+  type: 'model-test';
+  model?: 'tiny' | 'small';
+}
+
+interface ModelTestResultMessage {
+  type: 'model-test-result';
+  ok: boolean;
+  error?: string;
+}
+
 function postProgress(msg: Omit<ProgressMessage, 'type'>) {
   postMessage({ type: 'progress', ...msg } as ProgressMessage);
 }
@@ -247,8 +258,28 @@ async function transcribeAudio(data: TranscribeMessage) {
   }
 }
 
+async function runModelTest(model: 'tiny' | 'small' = 'tiny') {
+  const requestId = `model-test-${Date.now()}`;
+
+  try {
+    shouldAbort = false;
+    await loadModel(model, requestId);
+    postMessage({
+      type: 'model-test-result',
+      ok: true,
+    } as ModelTestResultMessage);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown model download error';
+    postMessage({
+      type: 'model-test-result',
+      ok: false,
+      error: message,
+    } as ModelTestResultMessage);
+  }
+}
+
 // Handle messages from main thread
-self.onmessage = async (e: MessageEvent<TranscribeMessage | PingMessage | CancelMessage>) => {
+self.onmessage = async (e: MessageEvent<TranscribeMessage | PingMessage | CancelMessage | ModelTestMessage>) => {
   if (e.data.type === 'ping') {
     postMessage({ type: 'pong' } as PongMessage);
     return;
@@ -265,6 +296,11 @@ self.onmessage = async (e: MessageEvent<TranscribeMessage | PingMessage | Cancel
 
   if (e.data.type === 'transcribe') {
     await transcribeAudio(e.data);
+    return;
+  }
+
+  if (e.data.type === 'model-test') {
+    await runModelTest(e.data.model ?? 'tiny');
   }
 };
 

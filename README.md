@@ -160,6 +160,16 @@ Also, FFmpeg core assets are served from same-origin (`/ffmpeg/ffmpeg-core.js`, 
 
 Implementation detail: `scripts/copy-ffmpeg-core.mjs` copies these assets from `node_modules/@ffmpeg/core` into `public/ffmpeg` during `postinstall`, and the npm scripts run it before `dev/build/preview`.
 
+## Deployment gotchas
+
+- Keep COOP/COEP headers enabled for every route in production:
+  - `vercel.json` for Vercel
+  - `netlify.toml` or `public/_headers` for Netlify
+- The FFmpeg copy script supports multiple `@ffmpeg/core` layouts (`dist/esm`, `dist/umd`, `dist`).
+- `ffmpeg-core.js` and `ffmpeg-core.wasm` are required and build will fail if they are missing.
+- `ffmpeg-core.worker.js` is optional; if absent in the installed package layout, the app logs a warning and falls back without explicitly providing a worker URL.
+- Build and preview run the copy script directly, so deployment does not depend solely on lifecycle hooks like `postinstall`.
+
 ## 📝 Usage
 
 1. **Upload a video** - Click "Upload Video" or drag & drop

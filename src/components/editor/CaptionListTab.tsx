@@ -96,6 +96,12 @@ export function CaptionListTab() {
     startTranscription(selectedModel);
   };
 
+  const handleRetryTranscription = () => {
+    if (!videoFile || isTranscribing) return;
+    autoRunKeyRef.current = null;
+    startTranscription(selectedModel);
+  };
+
   return (
     <div className="flex h-full flex-col">
       {!isIsolated && (
@@ -107,6 +113,12 @@ export function CaptionListTab() {
               <div className="mt-2 font-mono text-xs">
                 Cross-Origin-Opener-Policy: same-origin<br />
                 Cross-Origin-Embedder-Policy: require-corp
+              </div>
+              <a href="#transcription-isolation-help" className="mt-2 inline-block underline">
+                See setup help
+              </a>
+              <div id="transcription-isolation-help" className="mt-2 rounded border border-destructive/20 bg-background/70 p-2 text-xs">
+                For production hosting, configure COOP/COEP headers for all routes (see `vercel.json` or `netlify.toml`).
               </div>
             </div>
             <div className="mt-3 flex gap-2">
@@ -171,6 +183,11 @@ export function CaptionListTab() {
           <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
             <div className="font-medium">Transcription failed</div>
             <div className="mt-1">Error: {error}</div>
+            {videoFile && (
+              <Button size="sm" variant="secondary" className="mt-3" onClick={handleRetryTranscription} disabled={isTranscribing}>
+                Retry Transcription
+              </Button>
+            )}
             {debugDetails && (
               <details className="mt-3 text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">Debug details</summary>

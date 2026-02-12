@@ -4,6 +4,8 @@ import type { CaptionSegment, CaptionStyle } from '../types/caption';
 import { generateASS } from '../lib/export/assGenerator';
 
 let ffmpeg: FFmpeg | null = null;
+let hasCheckedWorkerAsset = false;
+let hasWorkerAsset = false;
 
 interface ExportMessage {
   type: 'export';
@@ -48,7 +50,7 @@ async function loadFFmpeg() {
 
   // Load FFmpeg core
   // Must be same-origin when Cross-Origin-Embedder-Policy is enabled (COEP: require-corp).
-  const baseURL = `${import.meta.env.BASE_URL}ffmpeg`;
+  const baseURL = new URL(`ffmpeg/`, self.location.origin + import.meta.env.BASE_URL).toString().replace(/\/$/, '');
 
   postMessage({
     type: 'progress',
@@ -56,11 +58,34 @@ async function loadFFmpeg() {
     message: 'Loading FFmpeg...',
   } as ProgressMessage);
 
-  await ffmpeg.load({
+  const loadOptions: {
+    coreURL: string;
+    wasmURL: string;
+    workerURL?: string;
+  } = {
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-  });
+  };
+
+  if (!hasCheckedWorkerAsset) {
+    hasCheckedWorkerAsset = true;
+    try {
+      const workerRes = await fetch(`${baseURL}/ffmpeg-core.worker.js`, { method: 'HEAD', cache: 'no-store' });
+      hasWorkerAsset = workerRes.ok;
+    } catch {
+      hasWorkerAsset = false;
+    }
+  }
+
+  if (hasWorkerAsset) {
+    try {
+      loadOptions.workerURL = await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript');
+    } catch (error) {
+      console.warn('[FFmpeg Export] worker URL unavailable, continuing without explicit workerURL', error);
+    }
+  }
+
+  await ffmpeg.load(loadOptions);
 
   postMessage({
     type: 'progress',

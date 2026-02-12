@@ -1,58 +1,168 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const repoRoot = process.cwd();
-const srcDir = path.join(repoRoot, 'node_modules', '@ffmpeg', 'core', 'dist', 'esm');
 const destDir = path.join(repoRoot, 'public', 'ffmpeg');
 
-const files = [
-  'ffmpeg-core.js',
-  'ffmpeg-core.wasm',
-  'ffmpeg-core.worker.js',
-];
+const CANDIDATES = {
+  coreJs: [
+    'dist/esm/ffmpeg-core.js',
+    'dist/umd/ffmpeg-core.js',
+    'dist/ffmpeg-core.js',
+  ],
+  coreWasm: [
+    'dist/esm/ffmpeg-core.wasm',
+    'dist/umd/ffmpeg-core.wasm',
+    'dist/ffmpeg-core.wasm',
+  ],
+  worker: [
+    'dist/esm/ffmpeg-core.worker.js',
+    'dist/esm/ffmpeg-core.worker.min.js',
+    'dist/esm/ffmpeg-core.worker.mjs',
+    'dist/umd/ffmpeg-core.worker.js',
+    'dist/umd/ffmpeg-core.worker.min.js',
+    'dist/umd/ffmpeg-core.worker.mjs',
+    'dist/ffmpeg-core.worker.js',
+    'dist/ffmpeg-core.worker.min.js',
+    'dist/ffmpeg-core.worker.mjs',
+  ],
+};
 
-async function exists(p) {
+async function exists(filePath) {
   try {
-    await fs.access(p);
+    await fs.access(filePath);
     return true;
   } catch {
     return false;
   }
 }
 
+async function findFirst(baseDir, relPaths) {
+  for (const rel of relPaths) {
+    const candidate = path.join(baseDir, rel);
+    if (await exists(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+async function findWorkerFallback(baseDir) {
+  const distDir = path.join(baseDir, 'dist');
+  if (!(await exists(distDir))) return null;
+
+  const queue = [distDir];
+  const seen = new Set();
+  const workerRegex = /ffmpeg-core.*worker.*\.(js|mjs)$/i;
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || seen.has(current)) continue;
+    seen.add(current);
+
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(fullPath);
+        continue;
+      }
+
+      if (entry.isFile() && workerRegex.test(entry.name)) {
+        return fullPath;
+      }
+    }
+  }
+
+  return null;
+}
+
+function relFromRepo(filePath) {
+  return path.relative(repoRoot, filePath).replace(/\\/g, '/');
+}
+
+async function copyAsset(src, destName) {
+  const dest = path.join(destDir, destName);
+  await fs.copyFile(src, dest);
+  return dest;
+}
+
 async function main() {
-  if (!(await exists(srcDir))) {
-    console.error(`[ffmpeg] Missing ${srcDir}`);
-    console.error('[ffmpeg] Run `npm install` to install @ffmpeg/core.');
+  const strict = process.argv.includes('--strict');
+  const mode = strict ? 'strict' : 'normal';
+  console.log(`[ffmpeg] Copy mode: ${mode}`);
+
+  let corePackageJsonPath;
+  try {
+    corePackageJsonPath = require.resolve('@ffmpeg/core/package.json');
+  } catch (error) {
+    console.error('[ffmpeg] Could not resolve @ffmpeg/core/package.json.');
+    console.error('[ffmpeg] Make sure @ffmpeg/core is installed and not pruned by your package manager.');
     process.exitCode = 1;
     return;
   }
 
+  const coreBaseDir = path.dirname(corePackageJsonPath);
   await fs.mkdir(destDir, { recursive: true });
 
-  let copied = 0;
-  for (const name of files) {
-    const from = path.join(srcDir, name);
-    const to = path.join(destDir, name);
-
-    if (!(await exists(from))) {
-      console.error(`[ffmpeg] Missing core asset: ${from}`);
-      process.exitCode = 1;
-      continue;
-    }
-
-    const shouldCopy = !(await exists(to));
-    if (shouldCopy) {
-      await fs.copyFile(from, to);
-      copied++;
-    }
+  const foundCoreJs = await findFirst(coreBaseDir, CANDIDATES.coreJs);
+  const foundCoreWasm = await findFirst(coreBaseDir, CANDIDATES.coreWasm);
+  let foundWorker = await findFirst(coreBaseDir, CANDIDATES.worker);
+  if (!foundWorker) {
+    foundWorker = await findWorkerFallback(coreBaseDir);
   }
 
-  // Keep output low-noise for dev loops.
-  if (copied > 0) {
-    console.log(`[ffmpeg] Copied ${copied} core asset(s) to public/ffmpeg`);
+  const copied = [];
+  if (foundCoreJs) {
+    copied.push({
+      type: 'core-js',
+      source: foundCoreJs,
+      output: await copyAsset(foundCoreJs, 'ffmpeg-core.js'),
+    });
   }
+  if (foundCoreWasm) {
+    copied.push({
+      type: 'core-wasm',
+      source: foundCoreWasm,
+      output: await copyAsset(foundCoreWasm, 'ffmpeg-core.wasm'),
+    });
+  }
+  if (foundWorker) {
+    copied.push({
+      type: 'worker',
+      source: foundWorker,
+      output: await copyAsset(foundWorker, 'ffmpeg-core.worker.js'),
+    });
+  }
+
+  console.log('[ffmpeg] Asset copy summary:');
+  console.log(`[ffmpeg] - package: ${relFromRepo(corePackageJsonPath)}`);
+  for (const item of copied) {
+    console.log(`[ffmpeg] - ${item.type}: ${relFromRepo(item.source)} -> ${relFromRepo(item.output)}`);
+  }
+
+  if (!foundWorker) {
+    console.warn('[ffmpeg] Worker asset not found in @ffmpeg/core package layout. Continuing without ffmpeg-core.worker.js.');
+  }
+
+  const missingRequired = [];
+  if (!foundCoreJs) missingRequired.push('ffmpeg-core.js');
+  if (!foundCoreWasm) missingRequired.push('ffmpeg-core.wasm');
+
+  if (missingRequired.length > 0) {
+    console.error(`[ffmpeg] Missing required core asset(s): ${missingRequired.join(', ')}`);
+    console.error('[ffmpeg] Searched under @ffmpeg/core package with candidate layouts:');
+    for (const p of CANDIDATES.coreJs) console.error(`[ffmpeg] - ${p}`);
+    for (const p of CANDIDATES.coreWasm) console.error(`[ffmpeg] - ${p}`);
+    console.error('[ffmpeg] Try pinning a compatible @ffmpeg/core version or inspect node_modules/@ffmpeg/core/dist.');
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log('[ffmpeg] Required assets are available in public/ffmpeg.');
 }
 
 await main();
-

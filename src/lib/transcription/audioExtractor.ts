@@ -4,6 +4,13 @@ import { toBlobURL } from '@ffmpeg/util';
 let ffmpeg: FFmpeg | null = null;
 const ffmpegLogTail: string[] = [];
 const MAX_FFMPEG_LOG_LINES = 200;
+const workerURLState: {
+  resolved: boolean;
+  available: boolean;
+} = {
+  resolved: false,
+  available: false,
+};
 
 function pushFFmpegLog(line: string) {
   ffmpegLogTail.push(line);
@@ -47,13 +54,37 @@ async function loadFFmpeg(onProgress?: (progress: number, message: string) => vo
   onProgress?.(5, 'Loading FFmpeg...');
 
   // Must be same-origin when Cross-Origin-Embedder-Policy is enabled (COEP: require-corp).
-  const baseURL = `${import.meta.env.BASE_URL}ffmpeg`;
+  const baseURL = new URL(`ffmpeg/`, window.location.origin + import.meta.env.BASE_URL).toString().replace(/\/$/, '');
 
-  await ffmpeg.load({
+  const loadOptions: {
+    coreURL: string;
+    wasmURL: string;
+    workerURL?: string;
+  } = {
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-  });
+  };
+
+  if (!workerURLState.resolved) {
+    try {
+      const workerRes = await fetch(`${baseURL}/ffmpeg-core.worker.js`, { method: 'HEAD', cache: 'no-store' });
+      workerURLState.available = workerRes.ok;
+    } catch {
+      workerURLState.available = false;
+    } finally {
+      workerURLState.resolved = true;
+    }
+  }
+
+  if (workerURLState.available) {
+    try {
+      loadOptions.workerURL = await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript');
+    } catch (e) {
+      console.warn('[FFmpeg Audio] Failed to prepare worker URL, falling back without explicit workerURL:', e);
+    }
+  }
+
+  await ffmpeg.load(loadOptions);
 
   onProgress?.(10, 'FFmpeg loaded');
 
