@@ -14,6 +14,8 @@ import { Button } from '../ui/Button';
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalDescription } from '../ui/Modal';
 import { ProgressBar } from '../ui/ProgressBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
+import { autoTranscribeOnImportAtom } from '../../atoms/settingsAtoms';
+import { DiagnosticsModal } from '../diagnostics/DiagnosticsModal';
 
 export function CaptionListTab() {
   const [segments, setSegments] = useAtom(captionSegmentsAtom);
@@ -25,8 +27,13 @@ export function CaptionListTab() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isTranscribeModalOpen, setIsTranscribeModalOpen] = useState(false);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<TranscriptionModel>('tiny');
-  const { isTranscribing, progress, error, startTranscription, cancelTranscription } = useTranscription();
+  const [autoTranscribeOnImport, setAutoTranscribeOnImport] = useAtom(autoTranscribeOnImportAtom);
+  const { isTranscribing, progress, error, debugDetails, startTranscription, cancelTranscription } = useTranscription();
+
+  const autoRunKeyRef = useRef<string | null>(null);
+  const isIsolated = typeof window !== 'undefined' ? window.crossOriginIsolated : true;
 
   const activeIds = new Set(activeCaptions.map((c) => c.id));
 
@@ -39,6 +46,23 @@ export function CaptionListTab() {
       }
     }
   }, [activeCaptions]);
+
+  // Auto-start transcription after video import (default ON).
+  useEffect(() => {
+    if (!videoFile) return;
+    if (!autoTranscribeOnImport) return;
+    if (isTranscribing) return;
+
+    // Only auto-run when starting from an empty caption list to avoid duplicating captions.
+    if (segments.length > 0) return;
+
+    const key = `${videoFile.file.name}:${videoFile.file.size}:${videoFile.file.lastModified}`;
+    if (autoRunKeyRef.current === key) return;
+    autoRunKeyRef.current = key;
+
+    // Skip the modal and start immediately with the selected default model.
+    startTranscription(selectedModel);
+  }, [autoTranscribeOnImport, isTranscribing, segments.length, selectedModel, startTranscription, videoFile]);
 
   const handleAddSegment = () => {
     const startTime = playback.currentTime;
@@ -74,6 +98,26 @@ export function CaptionListTab() {
 
   return (
     <div className="flex h-full flex-col">
+      {!isIsolated && (
+        <div className="border-b p-4">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+            <div className="font-medium text-destructive">Cross-origin isolation is missing</div>
+            <div className="mt-1 text-muted-foreground">
+              Transcription and FFmpeg.wasm require COOP/COEP headers. In dev and preview, this app must be served with:
+              <div className="mt-2 font-mono text-xs">
+                Cross-Origin-Opener-Policy: same-origin<br />
+                Cross-Origin-Embedder-Policy: require-corp
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setIsDiagnosticsOpen(true)}>
+                Open Diagnostics
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header actions */}
       <div className="flex flex-wrap gap-2 border-b p-4">
         <Button size="sm" onClick={handleAddSegment}>
@@ -90,6 +134,19 @@ export function CaptionListTab() {
         >
           {isTranscribing ? 'Transcribing...' : 'Transcribe'}
         </Button>
+
+        <Button size="sm" variant="secondary" onClick={() => setIsDiagnosticsOpen(true)}>
+          Diagnostics
+        </Button>
+
+        <label className="flex items-center gap-2 text-xs text-muted-foreground ml-auto">
+          <input
+            type="checkbox"
+            checked={autoTranscribeOnImport}
+            onChange={(e) => setAutoTranscribeOnImport(e.target.checked)}
+          />
+          Auto-transcribe on import
+        </label>
         <input
           ref={fileInputRef}
           type="file"
@@ -102,7 +159,7 @@ export function CaptionListTab() {
       {/* Transcription Progress */}
       {isTranscribing && (
         <div className="border-b p-4 space-y-2">
-          <ProgressBar value={progress.progress} label={progress.message} />
+          <ProgressBar value={progress.progress} label={`${progress.stage}: ${progress.message}`} />
           <Button size="sm" variant="destructive" onClick={cancelTranscription} className="w-full">
             Cancel Transcription
           </Button>
@@ -112,7 +169,14 @@ export function CaptionListTab() {
       {error && (
         <div className="border-b p-4">
           <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-            Error: {error}
+            <div className="font-medium">Transcription failed</div>
+            <div className="mt-1">Error: {error}</div>
+            {debugDetails && (
+              <details className="mt-3 text-xs text-muted-foreground">
+                <summary className="cursor-pointer select-none">Debug details</summary>
+                <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs">{debugDetails}</pre>
+              </details>
+            )}
           </div>
         </div>
       )}
@@ -188,6 +252,8 @@ export function CaptionListTab() {
           </div>
         </ModalContent>
       </Modal>
+
+      <DiagnosticsModal open={isDiagnosticsOpen} onOpenChange={setIsDiagnosticsOpen} />
     </div>
   );
 }

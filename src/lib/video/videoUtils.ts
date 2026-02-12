@@ -34,7 +34,7 @@ export async function loadVideoMetadata(file: File): Promise<VideoFile> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
-    let timeoutId: number;
+    let timeoutId = 0;
 
     const cleanup = () => {
       clearTimeout(timeoutId);

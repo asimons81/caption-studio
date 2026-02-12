@@ -13,10 +13,13 @@ import { DropZone } from './DropZone';
 import { handleVideoUpload } from '../../lib/video/fileHandler';
 import { videoFileAtom } from '../../atoms/videoAtoms';
 import { isUploadModalOpenAtom } from '../../atoms/uiAtoms';
+import { captionSegmentsAtom, selectedSegmentIdAtom } from '../../atoms/captionAtoms';
 
 export function UploadModal() {
   const [isOpen, setIsOpen] = useAtom(isUploadModalOpenAtom);
   const setVideoFile = useSetAtom(videoFileAtom);
+  const setSegments = useSetAtom(captionSegmentsAtom);
+  const setSelectedSegmentId = useSetAtom(selectedSegmentIdAtom);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -38,6 +41,9 @@ export function UploadModal() {
     try {
       const { videoFile, warning } = await handleVideoUpload(selectedFile);
       setVideoFile(videoFile);
+      // New upload implies a new project context.
+      setSegments([]);
+      setSelectedSegmentId(null);
 
       if (warning) {
         setWarning(warning);

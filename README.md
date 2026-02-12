@@ -149,6 +149,17 @@ npm run dev
 
 Then open http://localhost:5173
 
+## Transcription/FFmpeg Notes (COOP/COEP)
+
+This app uses `@ffmpeg/ffmpeg` (ffmpeg.wasm) and a Whisper Web Worker. For reliability in dev/preview/prod, it must run in a cross-origin isolated context:
+
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Embedder-Policy: require-corp`
+
+Also, FFmpeg core assets are served from same-origin (`/ffmpeg/ffmpeg-core.js`, `.wasm`, `.worker.js`) because COEP can block cross-origin subresources from CDNs.
+
+Implementation detail: `scripts/copy-ffmpeg-core.mjs` copies these assets from `node_modules/@ffmpeg/core` into `public/ffmpeg` during `postinstall`, and the npm scripts run it before `dev/build/preview`.
+
 ## 📝 Usage
 
 1. **Upload a video** - Click "Upload Video" or drag & drop

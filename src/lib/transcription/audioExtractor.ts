@@ -2,6 +2,37 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 
 let ffmpeg: FFmpeg | null = null;
+const ffmpegLogTail: string[] = [];
+const MAX_FFMPEG_LOG_LINES = 200;
+
+function pushFFmpegLog(line: string) {
+  ffmpegLogTail.push(line);
+  if (ffmpegLogTail.length > MAX_FFMPEG_LOG_LINES) {
+    ffmpegLogTail.splice(0, ffmpegLogTail.length - MAX_FFMPEG_LOG_LINES);
+  }
+}
+
+function getFFmpegLogTail(lines = 40) {
+  return ffmpegLogTail.slice(Math.max(0, ffmpegLogTail.length - lines));
+}
+
+function inferInputExtension(file: File): string {
+  const fromName = file.name.split('.').pop()?.toLowerCase();
+  if (fromName && fromName !== file.name.toLowerCase()) return fromName;
+
+  switch (file.type) {
+    case 'video/mp4':
+      return 'mp4';
+    case 'video/webm':
+      return 'webm';
+    case 'video/quicktime':
+      return 'mov';
+    case 'video/x-matroska':
+      return 'mkv';
+    default:
+      return 'mp4';
+  }
+}
 
 async function loadFFmpeg(onProgress?: (progress: number, message: string) => void): Promise<FFmpeg> {
   if (ffmpeg) return ffmpeg;
@@ -10,15 +41,18 @@ async function loadFFmpeg(onProgress?: (progress: number, message: string) => vo
 
   ffmpeg.on('log', ({ message }) => {
     console.log('[FFmpeg Audio]', message);
+    pushFFmpegLog(message);
   });
 
   onProgress?.(5, 'Loading FFmpeg...');
 
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+  // Must be same-origin when Cross-Origin-Embedder-Policy is enabled (COEP: require-corp).
+  const baseURL = `${import.meta.env.BASE_URL}ffmpeg`;
 
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
   });
 
   onProgress?.(10, 'FFmpeg loaded');
@@ -31,14 +65,19 @@ export async function extractAudioFromVideo(
   videoFile: File,
   onProgress?: (progress: number, message: string) => void
 ): Promise<Float32Array> {
+  const inputExt = inferInputExtension(videoFile);
+  const inputName = `input.${inputExt}`;
+  const outputName = 'output.pcm';
+
   try {
     const ffmpeg = await loadFFmpeg(onProgress);
+    ffmpegLogTail.length = 0;
 
     onProgress?.(15, 'Preparing video file...');
 
     // Write video file to FFmpeg virtual filesystem
     const videoData = new Uint8Array(await videoFile.arrayBuffer());
-    await ffmpeg.writeFile('input.mp4', videoData);
+    await ffmpeg.writeFile(inputName, videoData);
 
     onProgress?.(20, 'Extracting audio...');
 
@@ -46,18 +85,27 @@ export async function extractAudioFromVideo(
     // -ar 16000: sample rate 16kHz (Whisper requirement)
     // -ac 1: mono channel
     // -f f32le: 32-bit float little-endian PCM
-    await ffmpeg.exec([
-      '-i', 'input.mp4',
-      '-ar', '16000',
-      '-ac', '1',
-      '-f', 'f32le',
-      'output.pcm',
-    ]);
+    try {
+      await ffmpeg.exec([
+        '-i', inputName,
+        '-vn',
+        '-map', '0:a:0',
+        '-ar', '16000',
+        '-ac', '1',
+        '-f', 'f32le',
+        outputName,
+      ]);
+    } catch {
+      const tail = getFFmpegLogTail().join('\n');
+      const noAudio = tail.toLowerCase().includes('matches no streams') || tail.toLowerCase().includes('no such file or directory');
+      const hint = noAudio ? 'No audio track found in this video.' : 'FFmpeg failed to decode the video/audio.';
+      throw new Error(`${hint}\n\nFFmpeg log tail:\n${tail}`);
+    }
 
     onProgress?.(90, 'Reading audio data...');
 
     // Read the output PCM file
-    const pcmData = await ffmpeg.readFile('output.pcm');
+    const pcmData = await ffmpeg.readFile(outputName);
 
     // Ensure we have Uint8Array data
     if (typeof pcmData === 'string') {
@@ -76,8 +124,8 @@ export async function extractAudioFromVideo(
     const audioData = new Float32Array(float32Data);
 
     // Cleanup
-    await ffmpeg.deleteFile('input.mp4');
-    await ffmpeg.deleteFile('output.pcm');
+    await ffmpeg.deleteFile(inputName);
+    await ffmpeg.deleteFile(outputName);
 
     onProgress?.(100, 'Audio extraction complete');
 
@@ -89,5 +137,17 @@ export async function extractAudioFromVideo(
         ? `Failed to extract audio: ${error.message}`
         : 'Failed to extract audio from video'
     );
+  } finally {
+    // Best-effort cleanup (ignore errors; file may not exist).
+    try {
+      if (ffmpeg) await ffmpeg.deleteFile(inputName);
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (ffmpeg) await ffmpeg.deleteFile(outputName);
+    } catch {
+      /* ignore */
+    }
   }
 }

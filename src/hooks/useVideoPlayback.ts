@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
 import { videoRefAtom, playbackStateAtom } from '../atoms/videoAtoms';
 
+/* eslint-disable react-hooks/immutability */
 export function useVideoPlayback() {
   const [videoRef, setVideoRef] = useAtom(videoRefAtom);
   const setPlaybackState = useSetAtom(playbackStateAtom);

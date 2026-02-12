@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+public/ffmpeg/*
+!public/ffmpeg/.gitkeep
+.npm-cache/
+.claude/
 
 # Editor directories and files
 .vscode/*

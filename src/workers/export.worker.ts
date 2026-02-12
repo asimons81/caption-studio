@@ -47,7 +47,8 @@ async function loadFFmpeg() {
   });
 
   // Load FFmpeg core
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+  // Must be same-origin when Cross-Origin-Embedder-Policy is enabled (COEP: require-corp).
+  const baseURL = `${import.meta.env.BASE_URL}ffmpeg`;
 
   postMessage({
     type: 'progress',
@@ -58,6 +59,7 @@ async function loadFFmpeg() {
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
   });
 
   postMessage({
@@ -89,7 +91,9 @@ async function exportVideo(data: ExportMessage) {
 
     // Write video file to virtual filesystem
     const videoData = new Uint8Array(await data.videoFile.arrayBuffer());
-    await ffmpeg.writeFile('input.mp4', videoData);
+    const inputExt = data.videoFile.name.split('.').pop()?.toLowerCase() || 'mp4';
+    const inputName = `input.${inputExt}`;
+    await ffmpeg.writeFile(inputName, videoData);
 
     // Generate ASS subtitle file
     const assContent = generateASS(
@@ -108,7 +112,7 @@ async function exportVideo(data: ExportMessage) {
 
     // Run FFmpeg command to burn subtitles
     await ffmpeg.exec([
-      '-i', 'input.mp4',
+      '-i', inputName,
       '-vf', 'ass=subtitles.ass',
       '-c:v', 'libx264',
       '-crf', crf.toString(),
@@ -130,7 +134,7 @@ async function exportVideo(data: ExportMessage) {
     const blob = new Blob([regularArray], { type: 'video/mp4' });
 
     // Cleanup
-    await ffmpeg.deleteFile('input.mp4');
+    await ffmpeg.deleteFile(inputName);
     await ffmpeg.deleteFile('subtitles.ass');
     await ffmpeg.deleteFile('output.mp4');
 
