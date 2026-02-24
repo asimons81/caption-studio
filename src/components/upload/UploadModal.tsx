@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
+import { Loader2 } from 'lucide-react';
 import {
   Modal,
   ModalContent,
@@ -41,20 +42,20 @@ export function UploadModal() {
     try {
       const { videoFile, warning } = await handleVideoUpload(selectedFile);
       setVideoFile(videoFile);
-      // New upload implies a new project context.
       setSegments([]);
       setSelectedSegmentId(null);
 
       if (warning) {
         setWarning(warning);
-      }
-
-      // Close modal after successful upload
-      setTimeout(() => {
+        setTimeout(() => {
+          setIsOpen(false);
+          setSelectedFile(null);
+          setWarning(null);
+        }, 2000);
+      } else {
         setIsOpen(false);
         setSelectedFile(null);
-        setWarning(null);
-      }, warning ? 2000 : 0);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload video');
     } finally {
@@ -73,45 +74,50 @@ export function UploadModal() {
 
   return (
     <Modal open={isOpen} onOpenChange={handleClose}>
-      <ModalContent className="max-w-xl">
+      <ModalContent className="max-w-lg">
         <ModalHeader>
           <ModalTitle>Upload Video</ModalTitle>
           <ModalDescription>
-            Select a video file to add captions. Processing happens entirely in your browser.
+            Select a video file to add captions. All processing happens in your browser.
           </ModalDescription>
         </ModalHeader>
 
-        <div className="space-y-4">
-          <DropZone onFileSelect={handleFileSelect} />
-
-          {selectedFile && (
-            <div className="rounded-lg bg-muted p-4">
-              <p className="text-sm font-medium">{selectedFile.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-              </p>
-            </div>
-          )}
+        <div className="space-y-3">
+          <DropZone
+            onFileSelect={handleFileSelect}
+            selectedFile={selectedFile}
+          />
 
           {error && (
-            <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
               {error}
             </div>
           )}
 
           {warning && (
-            <div className="rounded-lg bg-yellow-500/10 p-4 text-sm text-yellow-600 dark:text-yellow-500">
+            <div className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2.5 text-sm text-warning-foreground">
               {warning}
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Processing video…
             </div>
           )}
         </div>
 
         <ModalFooter>
-          <Button variant="secondary" onClick={handleClose} disabled={isLoading}>
+          <Button variant="ghost" onClick={handleClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleUpload} disabled={!selectedFile || isLoading}>
-            {isLoading ? 'Loading...' : 'Upload'}
+          <Button
+            onClick={handleUpload}
+            disabled={!selectedFile || isLoading}
+            loading={isLoading}
+          >
+            {isLoading ? 'Loading…' : 'Upload'}
           </Button>
         </ModalFooter>
       </ModalContent>

@@ -11,7 +11,7 @@ export const TabsList = forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={clsx(
-      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
+      'flex items-center border-b border-border',
       className
     )}
     {...props}
@@ -26,10 +26,16 @@ export const TabsTrigger = forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={clsx(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      'relative inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium',
+      'text-muted-foreground whitespace-nowrap',
+      'transition-colors duration-150',
+      'hover:text-foreground',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
       'disabled:pointer-events-none disabled:opacity-50',
-      'data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+      // Active underline indicator
+      'after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full',
+      'after:bg-transparent after:transition-colors',
+      'data-[state=active]:text-foreground data-[state=active]:after:bg-primary',
       className
     )}
     {...props}
@@ -44,7 +50,7 @@ export const TabsContent = forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={clsx(
-      'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      'ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       className
     )}
     {...props}

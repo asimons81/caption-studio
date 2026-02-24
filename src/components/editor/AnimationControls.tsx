@@ -15,11 +15,11 @@ export function AnimationControls({
   onDurationChange,
 }: AnimationControlsProps) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">Animation</span>
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1.5 block text-xs text-muted-foreground">Type</label>
         <Select value={type} onValueChange={onTypeChange}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

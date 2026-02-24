@@ -1,4 +1,5 @@
 import { Provider } from 'jotai';
+import { Toaster } from 'sonner';
 import { MainLayout } from './components/layout';
 import { Sidebar } from './components/layout/Sidebar';
 import { VideoPreviewPanel } from './components/video/VideoPreviewPanel';
@@ -9,6 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useVideoCleanup } from './hooks/useCleanup';
+import { TooltipProvider } from './components/ui/Tooltip';
 
 function AppContent() {
   useKeyboardShortcuts();
@@ -35,7 +37,19 @@ function App() {
   return (
     <ErrorBoundary>
       <Provider>
-        <AppContent />
+        <TooltipProvider>
+          <AppContent />
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-foreground)',
+              },
+            }}
+          />
+        </TooltipProvider>
       </Provider>
     </ErrorBoundary>
   );

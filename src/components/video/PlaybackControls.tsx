@@ -1,102 +1,157 @@
+import { useState } from 'react';
 import { useAtomValue } from 'jotai';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import { playbackStateAtom } from '../../atoms/videoAtoms';
 import { useVideoPlayback } from '../../hooks/useVideoPlayback';
 import { formatTime } from '../../lib/video/videoUtils';
 import { Button } from '../ui/Button';
 import { Slider } from '../ui/Slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
+import { Tooltip } from '../ui/Tooltip';
+import clsx from 'clsx';
+
+const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 export function PlaybackControls() {
   const playback = useAtomValue(playbackStateAtom);
   const { togglePlay, seek, setVolume, setPlaybackRate } = useVideoPlayback();
+  const [isMuted, setIsMuted] = useState(false);
+  const [prevVolume, setPrevVolume] = useState(1);
 
-  const handleSeek = (value: number[]) => {
-    seek(value[0]);
-  };
+  const handleSeek = (value: number[]) => seek(value[0]);
 
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0]);
+    if (value[0] > 0) setIsMuted(false);
   };
 
-  const handleSpeedChange = (value: string) => {
-    setPlaybackRate(parseFloat(value));
+  const handleMuteToggle = () => {
+    if (isMuted) {
+      setVolume(prevVolume || 1);
+      setIsMuted(false);
+    } else {
+      setPrevVolume(playback.volume);
+      setVolume(0);
+      setIsMuted(true);
+    }
   };
+
+  const handleSkipBack = () => seek(Math.max(0, playback.currentTime - 10));
+  const handleSkipForward = () => seek(Math.min(playback.duration, playback.currentTime + 10));
+
+  const cycleSpeed = () => {
+    const currentIdx = SPEED_OPTIONS.indexOf(playback.playbackRate);
+    const nextIdx = (currentIdx + 1) % SPEED_OPTIONS.length;
+    setPlaybackRate(SPEED_OPTIONS[nextIdx]);
+  };
+
+  const effectiveVolume = isMuted ? 0 : playback.volume;
 
   return (
-    <div className="flex flex-col gap-2 bg-background p-4">
-      {/* Progress Bar */}
-      <Slider
-        value={[playback.currentTime]}
-        min={0}
-        max={playback.duration || 100}
-        step={0.1}
-        onValueChange={handleSeek}
-        className="w-full"
-      />
+    <div className="flex flex-col gap-2 bg-surface-1 border-t border-border px-4 pt-2 pb-3 shrink-0">
+      {/* Scrubber */}
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs text-muted-foreground tabular-nums w-10 shrink-0">
+          {formatTime(playback.currentTime)}
+        </span>
+        <Slider
+          value={[playback.currentTime]}
+          min={0}
+          max={playback.duration || 100}
+          step={0.05}
+          onValueChange={handleSeek}
+          className="flex-1"
+        />
+        <span className="font-mono text-xs text-muted-foreground tabular-nums w-10 shrink-0 text-right">
+          {formatTime(playback.duration)}
+        </span>
+      </div>
 
-      <div className="flex items-center justify-between gap-4">
-        {/* Left: Play/Pause */}
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={togglePlay}>
-            {playback.isPlaying ? (
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            ) : (
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            )}
-          </Button>
-
-          <span className="text-sm tabular-nums">
-            {formatTime(playback.currentTime)} / {formatTime(playback.duration)}
-          </span>
-        </div>
-
-        {/* Middle: Speed */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Speed:</span>
-          <Select value={playback.playbackRate.toString()} onValueChange={handleSpeedChange}>
-            <SelectTrigger className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0.5">0.5x</SelectItem>
-              <SelectItem value="0.75">0.75x</SelectItem>
-              <SelectItem value="1">1x</SelectItem>
-              <SelectItem value="1.25">1.25x</SelectItem>
-              <SelectItem value="1.5">1.5x</SelectItem>
-              <SelectItem value="2">2x</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Right: Volume */}
-        <div className="flex items-center gap-2">
-          <svg className="h-4 w-4 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"
-              clipRule="evenodd"
-            />
-          </svg>
+      {/* Controls row */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Left: Volume */}
+        <div className="flex items-center gap-1.5 w-28 shrink-0">
+          <Tooltip content={isMuted ? 'Unmute' : 'Mute'} side="top">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleMuteToggle}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            >
+              {isMuted || effectiveVolume === 0 ? (
+                <VolumeX className="h-3.5 w-3.5" />
+              ) : (
+                <Volume2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </Tooltip>
           <Slider
-            value={[playback.volume]}
+            value={[effectiveVolume]}
             min={0}
             max={1}
             step={0.01}
             onValueChange={handleVolumeChange}
-            className="w-24"
+            className="w-16"
           />
+        </div>
+
+        {/* Center: Transport controls */}
+        <div className="flex items-center gap-1">
+          <Tooltip content="Back 10s (J)" side="top">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSkipBack}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              <SkipBack className="h-4 w-4" />
+            </Button>
+          </Tooltip>
+
+          <Tooltip content={playback.isPlaying ? 'Pause (Space)' : 'Play (Space)'} side="top">
+            <button
+              onClick={togglePlay}
+              className={clsx(
+                'flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150',
+                'bg-primary text-white hover:opacity-90 active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              )}
+            >
+              {playback.isPlaying ? (
+                <Pause className="h-4 w-4 fill-current" />
+              ) : (
+                <Play className="h-4 w-4 fill-current translate-x-0.5" />
+              )}
+            </button>
+          </Tooltip>
+
+          <Tooltip content="Forward 10s (L)" side="top">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSkipForward}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          </Tooltip>
+        </div>
+
+        {/* Right: Speed */}
+        <div className="flex items-center justify-end w-28 shrink-0">
+          <Tooltip content="Cycle playback speed" side="top">
+            <button
+              onClick={cycleSpeed}
+              className={clsx(
+                'rounded-md border border-border bg-surface-2 px-2 py-0.5',
+                'font-mono text-xs text-muted-foreground',
+                'hover:bg-surface-3 hover:text-foreground transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                playback.playbackRate !== 1 && 'border-primary/40 text-primary',
+              )}
+            >
+              {playback.playbackRate}×
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>
