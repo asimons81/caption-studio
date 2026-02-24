@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAtomValue } from 'jotai';
+import { FileText, FileCode, Video, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { captionSegmentsAtom, globalStyleAtom } from '../../atoms/captionAtoms';
 import { videoFileAtom } from '../../atoms/videoAtoms';
 import { downloadSRT } from '../../lib/export/srtParser';
@@ -8,6 +10,32 @@ import { useExport, type ExportQuality } from '../../hooks/useExport';
 import { Button } from '../ui/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
 import { ProgressBar } from '../ui/ProgressBar';
+import clsx from 'clsx';
+
+function ExportCard({
+  icon,
+  title,
+  description,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  action: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 text-muted-foreground shrink-0">{icon}</div>
+        <div>
+          <p className="text-sm font-medium">{title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
 
 export function ExportTab() {
   const segments = useAtomValue(captionSegmentsAtom);
@@ -20,7 +48,7 @@ export function ExportTab() {
 
   const handleDownloadSRT = () => {
     if (segments.length === 0) {
-      alert('No captions to export');
+      toast.error('No captions to export');
       return;
     }
 
@@ -29,16 +57,18 @@ export function ExportTab() {
       : 'captions.srt';
 
     downloadSRT(segments, filename);
+    toast.success('SRT file downloaded');
   };
 
   const handleDownloadASS = () => {
     if (segments.length === 0 || !videoFile) {
-      alert('No captions or video to export');
+      toast.error('No captions or video loaded');
       return;
     }
 
     const filename = videoFile.file.name.replace(/\.[^/.]+$/, '') + '.ass';
     downloadASS(segments, style, videoFile.width, videoFile.height, filename);
+    toast.success('ASS file downloaded');
   };
 
   const handleExportVideo = () => {
@@ -54,147 +84,183 @@ export function ExportTab() {
     }
   };
 
+  const captionCount = segments.length;
+
   return (
-    <div className="h-full space-y-6 overflow-y-auto p-4">
-      {/* Subtitle Files */}
-      <section>
-        <h3 className="mb-2 font-semibold">Export Subtitle Files</h3>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Download caption files to use in other video players or editors.
-        </p>
+    <div className="h-full overflow-y-auto bg-surface-1">
+      {/* Header */}
+      <div className="border-b border-border px-4 py-2.5 flex items-center justify-between shrink-0">
+        <span className="text-sm font-medium">Export</span>
+        <span className={clsx(
+          'text-xs font-medium px-2 py-0.5 rounded-full',
+          captionCount > 0
+            ? 'bg-success/15 text-success'
+            : 'bg-surface-3 text-muted-foreground',
+        )}>
+          {captionCount} caption{captionCount !== 1 ? 's' : ''}
+        </span>
+      </div>
 
-        <div className="space-y-2">
-          <Button onClick={handleDownloadSRT} disabled={segments.length === 0} className="w-full">
-            Download SRT File
-          </Button>
-
-          <Button
-            onClick={handleDownloadASS}
-            disabled={segments.length === 0 || !videoFile}
-            variant="secondary"
-            className="w-full"
-          >
-            Download ASS File
-          </Button>
-
-          <div className="rounded-lg border p-3 text-sm">
-            <p className="font-medium">
-              {segments.length} caption{segments.length !== 1 ? 's' : ''} ready to export
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              SRT: Universal format • ASS: Advanced styling
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Video Export */}
-      <section>
-        <h3 className="mb-2 font-semibold">Export Video with Burned Captions</h3>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Permanently embed captions into your video. Processing happens entirely in your browser.
-        </p>
-
-        {!isExporting && !exportedBlob && (
-          <div className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium">Quality</label>
-              <Select value={quality} onValueChange={(v) => setQuality(v as ExportQuality)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fast">Fast (Lower quality, smaller file)</SelectItem>
-                  <SelectItem value="balanced">Balanced (Recommended)</SelectItem>
-                  <SelectItem value="high">High (Best quality, larger file)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+      <div className="p-4 space-y-3">
+        {/* SRT */}
+        <ExportCard
+          icon={<FileText className="h-4 w-4" />}
+          title="SRT Subtitle File"
+          description="Universal format — works with YouTube, VLC, and most players"
+          action={
             <Button
-              onClick={handleExportVideo}
-              disabled={segments.length === 0 || !videoFile}
-              className="w-full"
-            >
-              Export Video with Captions
-            </Button>
-
-            {!videoFile && (
-              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-500">
-                <p className="font-medium">⚠️ No video loaded</p>
-                <p className="mt-1 text-xs">Upload a video first to export</p>
-              </div>
-            )}
-
-            {segments.length === 0 && videoFile && (
-              <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-500">
-                <p className="font-medium">⚠️ No captions added</p>
-                <p className="mt-1 text-xs">Add captions before exporting</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {isExporting && (
-          <div className="space-y-4">
-            <ProgressBar value={progress.progress} label={progress.message} />
-            <Button onClick={cancelExport} variant="destructive" className="w-full">
-              Cancel Export
-            </Button>
-            <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-              <p>
-                This may take several minutes depending on video length and your device performance.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {exportedBlob && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-600 dark:text-green-500">
-              <p className="font-medium">✓ Export complete!</p>
-              <p className="mt-1 text-xs">
-                Video size: {(exportedBlob.size / (1024 * 1024)).toFixed(2)} MB
-              </p>
-            </div>
-
-            <Button onClick={handleDownloadVideo} className="w-full">
-              Download Video
-            </Button>
-
-            <Button
-              onClick={() => {
-                startExport(quality);
-              }}
+              onClick={handleDownloadSRT}
+              disabled={captionCount === 0}
               variant="secondary"
+              size="sm"
               className="w-full"
+              icon={<Download className="h-3.5 w-3.5" />}
             >
-              Export Again
+              Download .srt
             </Button>
-          </div>
-        )}
+          }
+        />
 
-        {error && (
-          <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
-            <p className="font-medium">Error: {error}</p>
-            <p className="mt-1 text-xs">
-              Make sure your browser supports FFmpeg.wasm. Chrome/Edge recommended.
-            </p>
-          </div>
-        )}
-      </section>
+        {/* ASS */}
+        <ExportCard
+          icon={<FileCode className="h-4 w-4" />}
+          title="ASS Subtitle File"
+          description="Advanced format — preserves all styling, colors and animations"
+          action={
+            <Button
+              onClick={handleDownloadASS}
+              disabled={captionCount === 0 || !videoFile}
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              icon={<Download className="h-3.5 w-3.5" />}
+            >
+              Download .ass
+            </Button>
+          }
+        />
 
-      {/* Tips */}
-      <section>
-        <h3 className="mb-2 font-semibold">Tips</h3>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          <li>• SRT files work with VLC, YouTube, and most video players</li>
-          <li>• ASS files preserve all styling (colors, fonts, animations)</li>
-          <li>• Video export processes entirely in your browser (no upload)</li>
-          <li>• Larger videos take longer to process - be patient!</li>
-          <li>• Close other tabs during export for better performance</li>
-        </ul>
-      </section>
+        {/* Video export */}
+        <div className="rounded-lg border border-border bg-surface-2 p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 text-muted-foreground shrink-0">
+              <Video className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Burned-in Video</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Permanently embed captions — processed entirely in your browser
+              </p>
+            </div>
+          </div>
+
+          {!isExporting && !exportedBlob && (
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-xs text-muted-foreground">Quality</label>
+                <Select value={quality} onValueChange={(v) => setQuality(v as ExportQuality)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fast">Fast — Lower quality, smaller file</SelectItem>
+                    <SelectItem value="balanced">Balanced — Recommended</SelectItem>
+                    <SelectItem value="high">High — Best quality, larger file</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                onClick={handleExportVideo}
+                disabled={captionCount === 0 || !videoFile}
+                size="sm"
+                className="w-full"
+                icon={<Video className="h-3.5 w-3.5" />}
+              >
+                Export Video with Captions
+              </Button>
+
+              {!videoFile && (
+                <p className="flex items-center gap-1.5 text-xs text-warning">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  Upload a video first
+                </p>
+              )}
+              {captionCount === 0 && videoFile && (
+                <p className="flex items-center gap-1.5 text-xs text-warning">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  Add captions before exporting
+                </p>
+              )}
+            </div>
+          )}
+
+          {isExporting && (
+            <div className="space-y-3">
+              <ProgressBar value={progress.progress} label={progress.message} />
+              <Button onClick={cancelExport} variant="destructive" size="sm" className="w-full">
+                Cancel Export
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Processing in your browser — this may take several minutes.
+              </p>
+            </div>
+          )}
+
+          {exportedBlob && !isExporting && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-md bg-success/10 border border-success/20 px-3 py-2">
+                <CheckCircle className="h-4 w-4 text-success shrink-0" />
+                <div>
+                  <p className="text-xs font-medium text-success">Export complete</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(exportedBlob.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleDownloadVideo}
+                size="sm"
+                className="w-full"
+                icon={<Download className="h-3.5 w-3.5" />}
+              >
+                Download Video
+              </Button>
+
+              <Button
+                onClick={() => startExport(quality)}
+                variant="secondary"
+                size="sm"
+                className="w-full"
+              >
+                Export Again
+              </Button>
+            </div>
+          )}
+
+          {error && !isExporting && (
+            <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
+              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-destructive">Export failed</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{error}</p>
+                <p className="text-xs text-muted-foreground">Chrome or Edge recommended.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tips */}
+        <div className="rounded-lg border border-border bg-surface-2 p-3 space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Tips</p>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            <li>• SRT works with VLC, YouTube, and most players</li>
+            <li>• ASS preserves all styling and animations</li>
+            <li>• Close other tabs during video export for better performance</li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

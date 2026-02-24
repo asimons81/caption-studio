@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { useAtom, useSetAtom, useAtomValue } from 'jotai';
 import { captionSegmentsAtom, selectedSegmentIdAtom } from '../atoms/captionAtoms';
 import { videoRefAtom } from '../atoms/videoAtoms';
+import { isShortcutsModalOpenAtom } from '../atoms/uiAtoms';
 import { removeSegment } from '../lib/caption/captionUtils';
 
 export function useKeyboardShortcuts() {
   const videoRef = useAtomValue(videoRefAtom);
   const [selectedId, setSelectedId] = useAtom(selectedSegmentIdAtom);
   const setSegments = useSetAtom(captionSegmentsAtom);
+  const setShortcutsOpen = useSetAtom(isShortcutsModalOpenAtom);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,9 +79,15 @@ export function useKeyboardShortcuts() {
         e.preventDefault();
         setSelectedId(null);
       }
+
+      // ? - Show keyboard shortcuts
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen(true);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [videoRef, selectedId, setSegments, setSelectedId]);
+  }, [videoRef, selectedId, setSegments, setSelectedId, setShortcutsOpen]);
 }

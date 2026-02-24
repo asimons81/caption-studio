@@ -35,20 +35,24 @@ export function PositionControls({
 
   return (
     <div>
-      <span className="mb-2 block text-sm text-muted-foreground">Position</span>
-      <div className="grid grid-cols-3 gap-1 rounded-lg border p-2">
-        {positions.map(({ v, h }) => (
-          <button
-            key={`${v}-${h}`}
-            onClick={() => handleClick(v, h)}
-            className={clsx(
-              'h-8 rounded border transition-colors',
-              vertical === v && horizontal === h
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-background hover:bg-accent'
-            )}
-          />
-        ))}
+      <span className="mb-2 block text-xs text-muted-foreground">Position</span>
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface-2 p-2">
+        {positions.map(({ v, h }) => {
+          const isActive = vertical === v && horizontal === h;
+          return (
+            <button
+              key={`${v}-${h}`}
+              onClick={() => handleClick(v, h)}
+              className={clsx(
+                'h-7 rounded transition-all duration-100',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                isActive
+                  ? 'bg-primary'
+                  : 'border border-border hover:bg-surface-4',
+              )}
+            />
+          );
+        })}
       </div>
     </div>
   );

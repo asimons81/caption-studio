@@ -7,10 +7,21 @@ export function Playhead() {
 
   return (
     <div
-      className="pointer-events-none absolute top-0 z-10 h-full w-0.5 bg-primary"
-      style={{ left: `${left}px` }}
+      className="pointer-events-none absolute top-0 z-20 h-full"
+      style={{ left: `${left}px`, width: '2px', transform: 'translateX(-1px)' }}
     >
-      <div className="absolute -left-1.5 -top-1 h-3 w-3 rounded-full bg-primary" />
+      {/* Diamond handle at top */}
+      <div
+        className="absolute -top-0.5 left-1/2 -translate-x-1/2"
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'hsl(0 80% 60%)',
+          clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+        }}
+      />
+      {/* Vertical line */}
+      <div className="absolute top-2 left-0 w-full h-full bg-red-500/80" />
     </div>
   );
 }

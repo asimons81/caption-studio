@@ -10,7 +10,7 @@ export function Sidebar({ children, className }: SidebarProps) {
   return (
     <aside
       className={clsx(
-        'flex flex-col border-r bg-muted/30',
+        'flex flex-col border-r border-border bg-surface-1',
         'w-full md:w-80 lg:w-96',
         className
       )}

@@ -13,3 +13,9 @@ export const transcriptionProgressAtom = atom<number>(0);
 export const isExportingAtom = atom<boolean>(false);
 
 export const exportProgressAtom = atom<number>(0);
+
+export const isSidebarCollapsedAtom = atom<boolean>(false);
+
+export const projectNameAtom = atom<string>('Untitled Project');
+
+export const isShortcutsModalOpenAtom = atom<boolean>(false);

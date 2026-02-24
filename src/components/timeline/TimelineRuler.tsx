@@ -2,25 +2,32 @@ import { useTimeline } from '../../hooks/useTimeline';
 import { formatTime } from '../../lib/video/videoUtils';
 
 export function TimelineRuler() {
-  const { duration, timeToPixels } = useTimeline();
+  const { duration, timeToPixels, pixelsPerSecond } = useTimeline();
 
   if (!duration) return null;
 
   const totalWidth = timeToPixels(duration);
-  const markers: Array<{ time: number; label: string }> = [];
 
-  // Generate time markers every second
-  for (let time = 0; time <= duration; time += 1) {
-    markers.push({ time, label: formatTime(time) });
+  // Decide label interval based on zoom level
+  const labelInterval = pixelsPerSecond >= 80 ? 1 : pixelsPerSecond >= 30 ? 5 : 10;
+  // Minor tick every second, major tick at label interval
+  const minorInterval = pixelsPerSecond >= 40 ? 0.5 : 1;
+
+  const ticks: Array<{ time: number; isMajor: boolean; showLabel: boolean }> = [];
+  for (let t = 0; t <= duration + 0.01; t += minorInterval) {
+    const rounded = Math.round(t * 100) / 100;
+    const isExact = Math.abs(rounded % 1) < 0.01;
+    const isMajor = isExact && Math.abs(rounded % labelInterval) < 0.01;
+    ticks.push({ time: rounded, isMajor, showLabel: isMajor });
   }
 
   return (
-    <div className="relative h-8 border-b bg-muted/30" style={{ width: totalWidth }}>
-      {markers.map(({ time, label }) => {
+    <div
+      className="relative h-7 bg-surface-2 border-b border-border select-none shrink-0"
+      style={{ width: `${totalWidth}px`, minWidth: '100%' }}
+    >
+      {ticks.map(({ time, isMajor, showLabel }) => {
         const left = timeToPixels(time);
-        const isSecond = time % 1 === 0;
-        const showLabel = time % 5 === 0; // Show label every 5 seconds
-
         return (
           <div
             key={time}
@@ -28,13 +35,12 @@ export function TimelineRuler() {
             style={{ left: `${left}px` }}
           >
             <div
-              className={`border-l border-border ${
-                isSecond ? 'h-3' : 'h-2'
-              }`}
+              className="border-l border-border/60"
+              style={{ height: isMajor ? '10px' : '5px' }}
             />
             {showLabel && (
-              <span className="absolute left-1 top-3 text-xs text-muted-foreground">
-                {label}
+              <span className="absolute top-2.5 left-1 text-[10px] font-mono text-muted-foreground tabular-nums whitespace-nowrap">
+                {formatTime(time)}
               </span>
             )}
           </div>

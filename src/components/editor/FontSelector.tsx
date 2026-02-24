@@ -8,10 +8,10 @@ interface FontSelectorProps {
 
 export function FontSelector({ value, onChange }: FontSelectorProps) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-muted-foreground">Font Family</span>
+    <div>
+      <label className="mb-1.5 block text-xs text-muted-foreground">Font Family</label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-40">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

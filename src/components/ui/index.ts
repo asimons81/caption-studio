@@ -4,3 +4,6 @@ export * from './Tabs';
 export * from './Modal';
 export * from './ProgressBar';
 export * from './Select';
+export * from './Tooltip';
+export * from './Switch';
+export * from './ConfirmDialog';

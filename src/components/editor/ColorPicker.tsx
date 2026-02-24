@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Button } from '../ui/Button';
+import clsx from 'clsx';
 
 interface ColorPickerProps {
   label: string;
@@ -11,7 +11,6 @@ interface ColorPickerProps {
 export function ColorPicker({ label, value, onChange }: ColorPickerProps) {
   const [localValue, setLocalValue] = useState(value);
 
-  // Extract RGB and alpha from #RRGGBBAA format
   const hexToRgba = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -52,36 +51,44 @@ export function ColorPicker({ label, value, onChange }: ColorPickerProps) {
 
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
       <Popover.Root>
         <Popover.Trigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-20 border"
-            style={{ backgroundColor: displayColor }}
+          <button
+            className={clsx(
+              'flex h-7 w-16 items-center gap-1.5 rounded-md border border-border px-1.5',
+              'hover:border-border/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            )}
           >
-            <span className="sr-only">Pick color</span>
-          </Button>
+            <span
+              className="h-4 w-4 shrink-0 rounded-sm border border-border/50"
+              style={{ backgroundColor: displayColor }}
+            />
+            <span className="font-mono text-[10px] text-muted-foreground truncate">
+              {localValue.slice(0, 7)}
+            </span>
+          </button>
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            className="z-50 rounded-lg border bg-popover p-4 shadow-md"
+            className="z-50 w-56 rounded-lg border border-border bg-popover p-3 shadow-lg shadow-black/30"
             sideOffset={5}
+            align="end"
           >
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">Color</label>
+                <label className="mb-1.5 block text-xs text-muted-foreground">Color</label>
                 <input
                   type="color"
                   value={`#${rgba.r.toString(16).padStart(2, '0')}${rgba.g.toString(16).padStart(2, '0')}${rgba.b.toString(16).padStart(2, '0')}`}
                   onChange={handleColorChange}
-                  className="h-10 w-full cursor-pointer rounded border"
+                  className="h-9 w-full cursor-pointer rounded-md border border-border bg-surface-2"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">
-                  Opacity: {Math.round(rgba.a * 100)}%
+                <label className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Opacity</span>
+                  <span className="font-mono">{Math.round(rgba.a * 100)}%</span>
                 </label>
                 <input
                   type="range"
@@ -90,10 +97,12 @@ export function ColorPicker({ label, value, onChange }: ColorPickerProps) {
                   step="0.01"
                   value={rgba.a}
                   onChange={handleAlphaChange}
-                  className="w-full"
+                  className="w-full accent-primary"
                 />
               </div>
-              <div className="text-xs font-mono text-muted-foreground">{localValue}</div>
+              <div className="font-mono text-[10px] text-muted-foreground bg-surface-3 rounded px-2 py-1">
+                {localValue}
+              </div>
             </div>
           </Popover.Content>
         </Popover.Portal>
