@@ -48,9 +48,21 @@ export function splitSegment(
     return segments;
   }
 
-  const midpoint = Math.floor(segment.text.length / 2);
-  const firstText = segment.text.slice(0, midpoint).trim();
-  const secondText = segment.text.slice(midpoint).trim();
+  const text = segment.text;
+  const mid = Math.floor(text.length / 2);
+  // Prefer splitting at a word boundary nearest to the midpoint.
+  const spaces = [...text.matchAll(/ /g)].map((m) => m.index as number);
+  const splitAt =
+    spaces.length > 0
+      ? spaces.reduce((best, pos) =>
+          Math.abs(pos - mid) < Math.abs(best - mid) ? pos : best
+        )
+      : mid;
+  // Ensure neither half is empty after trimming.
+  const rawFirst = text.slice(0, splitAt || 1);
+  const rawSecond = text.slice(splitAt || 1);
+  const firstText = rawFirst.trim() || rawSecond.trim().slice(0, 1);
+  const secondText = rawSecond.trim() || rawFirst.trim().slice(-1);
 
   const firstSegment: CaptionSegment = {
     ...segment,

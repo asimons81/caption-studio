@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { captionSegmentsAtom, selectedSegmentIdAtom, activeCaptionsAtom } from '../../atoms/captionAtoms';
 import { updateSegment } from '../../lib/caption/captionUtils';
 import { useTimeline } from '../../hooks/useTimeline';
@@ -8,7 +8,7 @@ import clsx from 'clsx';
 export function CaptionTrack() {
   const [segments, setSegments] = useAtom(captionSegmentsAtom);
   const [selectedId, setSelectedId] = useAtom(selectedSegmentIdAtom);
-  const activeCaptions = useAtom(activeCaptionsAtom)[0];
+  const activeCaptions = useAtomValue(activeCaptionsAtom);
   const { timeToPixels, pixelsToTime, duration } = useTimeline();
 
   const [draggingId, setDraggingId] = useState<string | null>(null);

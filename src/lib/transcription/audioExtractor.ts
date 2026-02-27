@@ -154,10 +154,6 @@ export async function extractAudioFromVideo(
     // Copy to a new array to avoid SharedArrayBuffer issues
     const audioData = new Float32Array(float32Data);
 
-    // Cleanup
-    await ffmpeg.deleteFile(inputName);
-    await ffmpeg.deleteFile(outputName);
-
     onProgress?.(100, 'Audio extraction complete');
 
     return audioData;

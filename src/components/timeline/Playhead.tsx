@@ -16,12 +16,12 @@ export function Playhead() {
         style={{
           width: '10px',
           height: '10px',
-          background: 'hsl(0 80% 60%)',
+          background: 'var(--color-primary)',
           clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
         }}
       />
       {/* Vertical line */}
-      <div className="absolute top-2 left-0 w-full h-full bg-red-500/80" />
+      <div className="absolute top-2 left-0 w-full h-full bg-primary/80" />
     </div>
   );
 }
